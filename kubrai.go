@@ -156,7 +156,7 @@ func getStringProperty(name string) string {
 		warnFileReadError(err)
 		return ""
 	}
-	str := string(bs)
+	str := strings.Trim(string(bs), " \n")
 
 	return str
 }
