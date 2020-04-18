@@ -26,9 +26,9 @@ func Test_findExactVerb(t *testing.T) {
 			want: "",
 		},
 		{
-			name: "interact",
-			args: args{[]string{"interact"}},
-			want: "interact",
+			name: "play",
+			args: args{[]string{"play"}},
+			want: "play",
 		},
 		{
 			name: "wrong",
@@ -60,9 +60,9 @@ func Test_guessVerb(t *testing.T) {
 		want string
 	}{
 		{
-			name: "interact",
+			name: "play",
 			args: args{[]string{}},
-			want: "interact",
+			want: "play",
 		},
 		{
 			name: "solve",
@@ -339,7 +339,7 @@ func Test_canonize(t *testing.T) {
 }
 
 func Test_saveAndLoadAssoc(t *testing.T) {
-	assocFile := "./associations/associationsTest.txt"
+	assocFile := getCurrentPlaybookDir() + "/associations/associationsTest.txt"
 	assoc := make(map[string][]string)
 	assoc["aaa"] = []string{"bbb", "ccc"}
 
@@ -429,7 +429,7 @@ func unsimulateProperty(propName string) {
 }
 
 func simulateDefaultAssoc(assoc map[string][]string) {
-	assocFile := getStringProperty(propAssocFileLocation)
+	assocFile := getFullAssocFileLocation()
 	assocFileOrig := assocFile + ".orig"
 
 	if _, err := os.Stat(assocFileOrig); os.IsNotExist(err) {
@@ -440,7 +440,7 @@ func simulateDefaultAssoc(assoc map[string][]string) {
 }
 
 func unsimulateDefaultAssoc() {
-	assocFile := getStringProperty(propAssocFileLocation)
+	assocFile := getFullAssocFileLocation()
 	assocFileOrig := assocFile + ".orig"
 
 	os.Rename(assocFileOrig, assocFile)
@@ -578,74 +578,61 @@ func Test_runSmartAdd(t *testing.T) {
 		b string
 	}
 	tests := []struct {
-		name  string
-		args  args
-		want  [2][]string
-		want1 uint8
+		name string
+		args args
+		want map[string][]string
 	}{
 		{
-			name:  "Test01",
-			args:  args{"1", "12"},
-			want:  [2][]string{{"12"}, {"1"}},
-			want1: 2,
+			name: "Test01",
+			args: args{"1", "12"},
+			want: map[string][]string{"1": {"12"}, "12": {"1"}},
 		},
 		{
-			name:  "Test02",
-			args:  args{"12", "123"},
-			want:  [2][]string{{"1", "123"}, {"12"}},
-			want1: 2,
+			name: "Test02",
+			args: args{"12", "123"},
+			want: map[string][]string{"12": {"1", "123"}, "123": {"12"}},
 		},
 		{
-			name:  "Test03",
-			args:  args{"123", "1234"},
-			want:  [2][]string{{"12", "1234"}, {"123"}},
-			want1: 2,
+			name: "Test03",
+			args: args{"123", "1234"},
+			want: map[string][]string{"123": {"12", "1234"}, "1234": {"123"}},
 		},
 		{
-			name:  "Test04",
-			args:  args{"1234", "12345"},
-			want:  [2][]string{{"123", "12345"}, nil},
-			want1: 1,
+			name: "Test04",
+			args: args{"1234", "12345"},
+			want: map[string][]string{"1234": {"123", "12345"}},
 		},
 		{
-			name:  "Test05",
-			args:  args{"12345", "1"},
-			want:  [2][]string{{"1"}, nil},
-			want1: 1,
+			name: "Test05",
+			args: args{"12345", "1"},
+			want: map[string][]string{"12345": {"1"}},
 		},
 		{
-			name:  "Test01again",
-			args:  args{"1", "12"},
-			want:  [2][]string{{"12"}, {"1", "123"}},
-			want1: 2,
+			name: "Test01again",
+			args: args{"1", "12"},
+			want: map[string][]string{"1": {"12"}, "12": {"1", "123"}},
 		},
 		{
-			name:  "Test01cyrillic",
-			args:  args{"шаг", "па"},
-			want:  [2][]string{{"па"}, {"шаг"}},
-			want1: 2,
+			name: "Test01cyrillic",
+			args: args{"шаг", "па"},
+			want: map[string][]string{"шаг": {"па"}, "па": {"шаг"}},
 		},
 		{
-			name:  "Test02cyrillic",
-			args:  args{"па", "ап"},
-			want:  [2][]string{{"ап", "шаг"}, {"па"}},
-			want1: 2,
+			name: "Test02cyrillic",
+			args: args{"па", "ап"},
+			want: map[string][]string{"па": {"ап", "шаг"}, "ап": {"па"}},
 		},
 		{
-			name:  "Test03cyrillic",
-			args:  args{"ватта", "ома"},
-			want:  [2][]string{{"ома"}, nil},
-			want1: 1,
+			name: "Test03cyrillic",
+			args: args{"ватта", "ома"},
+			want: map[string][]string{"ватта": {"ома"}},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got1 := runSmartAdd(tt.args.a, tt.args.b)
+			got := runSmartAdd(tt.args.a, tt.args.b)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("runSmartAdd() got = %v, want %v", got, tt.want)
-			}
-			if got1 != tt.want1 {
-				t.Errorf("runSmartAdd() got1 = %v, want %v", got1, tt.want1)
 			}
 		})
 	}
@@ -850,7 +837,7 @@ func Test_loadDicts(t *testing.T) {
 	simulateProperty(propDictsExt, ".test")
 	defer unsimulateProperty(propDictsExt)
 
-	dictsDir := getStringProperty(propDictsDir)
+	dictsDir := getFullDictsDir()
 	filePutContents(dictsDir+"/"+"dict.test", "aa\nbb")
 	defer fileRemove(dictsDir + "/" + "dict.test")
 
@@ -983,7 +970,7 @@ func Test_runSolve(t *testing.T) {
 	simulateProperty(propSolveMaxResults, "3")
 	defer unsimulateProperty(propSolveMaxResults)
 
-	dictsDir := getStringProperty(propDictsDir)
+	dictsDir := getFullDictsDir()
 	filePutContents(dictsDir+"/"+"dict.test", strings.Join(
 		[]string{
 			"boycott",
@@ -1098,7 +1085,7 @@ func Test_runSearchDict(t *testing.T) {
 	simulateProperty(propDictsExt, ".test")
 	defer unsimulateProperty(propDictsExt)
 
-	dictsDir := getStringProperty(propDictsDir)
+	dictsDir := getFullDictsDir()
 	filePutContents(dictsDir+"/"+"dict.test", strings.Join(
 		[]string{
 			"worda",
@@ -1196,7 +1183,7 @@ func Test_searchDictByRegexpGetWords(t *testing.T) {
 	simulateProperty(propDictsExt, ".test")
 	defer unsimulateProperty(propDictsExt)
 
-	dictsDir := getStringProperty(propDictsDir)
+	dictsDir := getFullDictsDir()
 	filePutContents(dictsDir+"/"+"dict.test", strings.Join(
 		[]string{
 			"aabbcc",
@@ -1276,7 +1263,7 @@ func Test_runGuess(t *testing.T) {
 	simulateProperty(propGuessUnknownsLimit, "2")
 	defer unsimulateProperty(propGuessUnknownsLimit)
 
-	dictsDir := getStringProperty(propDictsDir)
+	dictsDir := getFullDictsDir()
 	filePutContents(dictsDir+"/"+"dict.test", strings.Join(
 		[]string{
 			"boycott",
@@ -1430,5 +1417,25 @@ func Test_sortByUnknownsInWord(t *testing.T) {
 				t.Errorf("sortByUnknownsInWord() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func Test_getPossibleVerbs(t *testing.T) {
+	got := getPossibleVerbs()
+
+	foundSolve := false
+	re := regexp.MustCompile("^[A-Za-z]+$")
+	for _, v := range got {
+		if v == "solve" {
+			foundSolve = true
+		}
+
+		if !re.MatchString(v) {
+			t.Errorf("getPossibleVerbs() verb should avoid using special chars: %s", v)
+		}
+	}
+
+	if !foundSolve {
+		t.Errorf("getPossibleVerbs() doesn't contain solve")
 	}
 }

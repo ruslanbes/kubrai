@@ -1,0 +1,14 @@
+xi:psi
+in:out
+amateur:pro
+thanks:ty
+6:mi
+mi:6
+question:y
+policeman:cop
+period:term
+girl:boy,woman
+boy:man,girl,child
+psi:xi
+math:math,science,philosophy
+out:in

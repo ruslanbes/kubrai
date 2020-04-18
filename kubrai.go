@@ -14,17 +14,19 @@ import (
 
 // verbs
 const (
-	vAdd        = "add"
-	vAddBoth    = "addboth"
-	vGuess      = "guess"
-	vHint       = "hint"
-	vInteract   = "interact"
-	vRemove     = "remove"
-	vRemoveBoth = "removeboth"
-	vSearchDict = "searchdict"
-	vSolve      = "solve"
-	vUndo       = "undo"
-	vView       = "view"
+	vAdd         = "add"
+	vAddBoth     = "addboth"
+	vAddSolution = "addsolution"
+	vGuess       = "guess"
+	vHint        = "hint"
+	vPlay        = "play"
+	vPlaybook    = "playbook"
+	vRemove      = "remove"
+	vRemoveBoth  = "removeboth"
+	vSearchDict  = "searchdict"
+	vSolve       = "solve"
+	vUndo        = "undo"
+	vView        = "view"
 )
 
 const propertyDir = "./properties"
@@ -37,16 +39,18 @@ const (
 	propAssocFileKeySeparator       = "AssocFileKeySeparator"
 	propAssocFileLocation           = "AssocFileLocation"
 	propAssocFileValSeparator       = "AssocFileValSeparator"
+	propDictsDir                    = "DictsDir"
+	propDictsExt                    = "DictsExt"
 	propGuessExplainResults         = "GuessExplainResults"
 	propGuessMaxResults             = "GuessMaxResults"
 	propGuessUnknownMarker          = "GuessUnknownMarker"
 	propGuessUnknownsLimit          = "GuessUnknownsLimit"
+	propPlaybookCurrent             = "PlaybookCurrent"
+	propPlaybooksDir                = "PlaybooksDir"
 	propSearchDictDefaultMaxResults = "SearchDictDefaultMaxResults"
 	propSolveAutoGuess              = "SolveAutoGuess"
 	propSolveMaxResults             = "SolveMaxResults"
 	propSolveKubrayaSeparator       = "SolveKubrayaSeparator"
-	propDictsDir                    = "DictsDir"
-	propDictsExt                    = "DictsExt"
 )
 
 func findExactVerb(args []string) string {
@@ -63,14 +67,14 @@ func findExactVerb(args []string) string {
 	return ""
 }
 
-func getPossibleVerbs() [11]string {
-	return [...]string{vAdd, vAddBoth, vRemove, vRemoveBoth, vView, vSearchDict, vSolve, vGuess, vHint, vInteract, vUndo}
+func getPossibleVerbs() [13]string {
+	return [...]string{vAdd, vAddBoth, vAddSolution, vRemove, vRemoveBoth, vView, vSearchDict, vSolve, vGuess, vHint, vPlay, vUndo, vPlaybook}
 }
 
 func guessVerb(args []string) string {
 	var verb string
 
-	verb = guessInteractVerb(args)
+	verb = guessPlayVerb(args)
 	if verb != "" {
 		return verb
 	}
@@ -88,9 +92,9 @@ func guessVerb(args []string) string {
 	return ""
 }
 
-func guessInteractVerb(args []string) string {
+func guessPlayVerb(args []string) string {
 	if len(args) == 0 {
-		return vInteract
+		return vPlay
 	}
 
 	return ""
@@ -228,7 +232,7 @@ func rotateBackups(file string) {
 	lastBakFile := backupName(file, 10)
 	os.Remove(lastBakFile)
 
-	for i := 9; i > 0; i-- {
+	for i := 99; i > 0; i-- {
 		bacFile := backupName(file, i)
 		nextBacFile := backupName(file, i+1)
 		os.Rename(bacFile, nextBacFile)
@@ -260,12 +264,19 @@ func saveAssoc(assocFile string, assoc map[string][]string) {
 	}
 }
 
+func getFullAssocFileLocation() string {
+	assocFileLocation := getStringProperty(propAssocFileLocation)
+	playbookDir := getCurrentPlaybookDir()
+
+	return playbookDir + "/" + assocFileLocation
+}
+
 func saveDefaultAssoc(assoc map[string][]string) {
-	saveAssoc(getStringProperty(propAssocFileLocation), assoc)
+	saveAssoc(getFullAssocFileLocation(), assoc)
 }
 
 func loadDefaultAssoc() map[string][]string {
-	return loadAssoc(getStringProperty(propAssocFileLocation))
+	return loadAssoc(getFullAssocFileLocation())
 }
 
 func addBeforeFirstLonger(s string, slc []string) []string {
@@ -315,13 +326,40 @@ func runAddBoth(a string, b string) [2][]string {
 	return res
 }
 
-func runSmartAdd(a string, b string) ([2][]string, uint8) {
-	if len([]rune(a)) <= getIntProperty(propAddAutoBothMaxlen) {
-		return runAddBoth(a, b), 2
+func runAddSolution(src string, target string) map[string][]string {
+	partsSrc := splitKubraya(src)
+	partsTarget := splitKubraya(target)
+	if len(partsSrc) != len(partsTarget) {
+		log.Fatal("nothing")
 	}
-	var res [2][]string
-	res[0] = runAdd(a, b)
-	return res, 1
+
+	res := map[string][]string{}
+	for i := range partsSrc {
+		addRes := runSmartAdd(partsSrc[i], partsTarget[i])
+
+		for k, v := range addRes {
+			res[k] = v
+		}
+	}
+
+	return res
+}
+
+func runSmartAdd(a string, b string) map[string][]string {
+	if isKubraya(a) && isKubraya(b) {
+		return runAddSolution(a, b)
+	}
+
+	if len([]rune(a)) <= getIntProperty(propAddAutoBothMaxlen) {
+		tmp := runAddBoth(a, b)
+		res := map[string][]string{}
+		res[a] = tmp[0]
+		res[b] = tmp[1]
+		return res
+	}
+
+	res := map[string][]string{a: runAdd(a, b)}
+	return res
 }
 
 func removeByValue(s string, slc []string) []string {
@@ -395,8 +433,21 @@ func readFileToSlice(file string, cap int) []string {
 	return slc
 }
 
-func loadDicts() map[string][]string {
+func getCurrentPlaybookDir() string {
+	playbook := getStringProperty(propPlaybookCurrent)
+	playbooksDir := getStringProperty(propPlaybooksDir)
+
+	return playbooksDir + "/" + playbook
+}
+
+func getFullDictsDir() string {
 	dictsDir := getStringProperty(propDictsDir)
+	playbookDir := getCurrentPlaybookDir()
+	return playbookDir + "/" + dictsDir
+}
+
+func loadDicts() map[string][]string {
+	dictsDir := getFullDictsDir()
 	dictsExt := getStringProperty(propDictsExt)
 	lenExt := len(dictsExt)
 	list := readDirNames(dictsDir)
@@ -727,17 +778,57 @@ func runGuess(kubraya string) ([]string, bool) {
 	return []string{}, false
 }
 
+func runListPlaybooks() []string {
+	playbooksDir := getStringProperty(propPlaybooksDir)
+	playbookCurrent := getStringProperty(propPlaybookCurrent)
+
+	res := []string{}
+	files, err := ioutil.ReadDir(playbooksDir)
+	checkError(err)
+	for _, f := range files {
+		if !f.IsDir() {
+			continue
+		}
+		var ff string
+		if f.Name() == playbookCurrent {
+			ff = "* "
+		} else {
+			ff = "  "
+		}
+		res = append(res, ff+f.Name())
+	}
+
+	return res
+}
+
+func findStringInSlice(str string, strings []string) int {
+	for k, v := range strings {
+		if v == str {
+			return k
+		}
+	}
+	return -1
+}
+
 func runCommand(verb string, nouns []string) string {
 	switch verb {
 	case vAdd:
-		res, num := runSmartAdd(nouns[0], nouns[1])
-		if num == 2 {
-			return buildAssocString(nouns[0], res[0]) + "\n" + buildAssocString(nouns[1], res[1])
+		tmp := runSmartAdd(nouns[0], nouns[1])
+		res := []string{}
+		for k, v := range tmp {
+			res = append(res, buildAssocString(k, v))
 		}
-		return buildAssocString(nouns[0], res[0])
+		return strings.Join(res, "\n")
 	case vAddBoth:
 		res := runAddBoth(nouns[0], nouns[1])
 		return buildAssocString(nouns[0], res[0]) + "\n" + buildAssocString(nouns[1], res[1])
+	case vAddSolution:
+		tmp := runAddSolution(nouns[0], nouns[1])
+		res := []string{}
+		for k, v := range tmp {
+			res = append(res, buildAssocString(k, v))
+		}
+		return strings.Join(res, "\n")
 	case vGuess:
 		if res, ok := runGuess(nouns[0]); ok {
 			return strings.Join(res, "\n")
@@ -749,6 +840,9 @@ func runCommand(verb string, nouns []string) string {
 	case vRemoveBoth:
 		res := runRemoveBoth(nouns[0], nouns[1])
 		return buildAssocString(nouns[0], res[0]) + "\n" + buildAssocString(nouns[1], res[1])
+	case vPlaybook:
+		res := runListPlaybooks()
+		return strings.Join(res, "\n")
 	case vSearchDict:
 		res := runSearchDict(nouns[0], getIntProperty(propSearchDictDefaultMaxResults))
 		if len(res) == 0 {
