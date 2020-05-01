@@ -1,15 +1,24 @@
 package main
 
 import (
-	"bytes"
-	"fmt"
-	"log"
 	"os"
 	"reflect"
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/ruslanbes/kubrai/fileutils"
+	"github.com/ruslanbes/kubrai/property"
 )
+
+func setUpTestProperties(props map[string]string) {
+	testPropertyDir := "./test/data/properties"
+	os.RemoveAll(testPropertyDir)
+	os.Mkdir(testPropertyDir, 0777)
+
+	property.PropertyDir = testPropertyDir
+	property.SetProperties(props)
+}
 
 func Test_findExactVerb(t *testing.T) {
 	type args struct {
@@ -51,6 +60,8 @@ func Test_findExactVerb(t *testing.T) {
 }
 
 func Test_guessVerb(t *testing.T) {
+	setUpTestProperties(map[string]string{propSolveKubrayaSeparator: "_"})
+
 	type args struct {
 		args []string
 	}
@@ -162,133 +173,6 @@ func Test_extractNouns(t *testing.T) {
 	}
 }
 
-func filePutContents(filename string, data string) {
-	file, err := os.Create(filename)
-	if err != nil {
-		fmt.Println(fmt.Errorf("Error creating testfile %s", err))
-		return
-	}
-	defer file.Close()
-
-	file.WriteString(data)
-}
-
-func fileRemove(filename string) {
-	err := os.Remove(filename)
-	if err != nil {
-		fmt.Println(fmt.Errorf("Error deleting testfile %s", err))
-		return
-	}
-}
-
-// https://stackoverflow.com/questions/44119951/how-to-check-a-log-output-in-go-test
-// need to check the actual log message as well
-func simulateLogger() {
-	var buf bytes.Buffer
-	log.SetOutput(&buf)
-}
-
-func unsimulateLogger() {
-	log.SetOutput(os.Stderr)
-}
-
-func Test_getIntProperty(t *testing.T) {
-	filePutContents(propertyDir+"/testIntNeg", "-42")
-	defer fileRemove(propertyDir + "/testIntNeg")
-
-	filePutContents(propertyDir+"/testIntZero", "0")
-	defer fileRemove(propertyDir + "/testIntZero")
-
-	filePutContents(propertyDir+"/testIntPos", "42")
-	defer fileRemove(propertyDir + "/testIntPos")
-
-	simulateLogger()
-	defer unsimulateLogger()
-
-	type args struct {
-		name string
-	}
-	tests := []struct {
-		name string
-		args args
-		want int
-	}{
-		{
-			name: "Neg",
-			args: args{"testIntNeg"},
-			want: -42,
-		},
-		{
-			name: "Zero",
-			args: args{"testIntZero"},
-			want: 0,
-		},
-		{
-			name: "Pos",
-			args: args{"testIntPos"},
-			want: 42,
-		},
-		{
-			name: "NonExist",
-			args: args{"testNonexistentFile"},
-			want: 0,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := getIntProperty(tt.args.name); got != tt.want {
-				t.Errorf("getIntProperty() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_getBoolProperty(t *testing.T) {
-	filePutContents(propertyDir+"/testBoolOn", "ON")
-	defer fileRemove(propertyDir + "/testBoolOn")
-
-	filePutContents(propertyDir+"/testBoolOff", "OFF")
-	defer fileRemove(propertyDir + "/testBoolOff")
-
-	filePutContents(propertyDir+"/testBoolWrong", "Wrong")
-	defer fileRemove(propertyDir + "/testBoolWrong")
-
-	simulateLogger()
-	defer unsimulateLogger()
-
-	type args struct {
-		name string
-	}
-	tests := []struct {
-		name string
-		args args
-		want bool
-	}{
-		{
-			name: "On",
-			args: args{"testBoolOn"},
-			want: true,
-		},
-		{
-			name: "Off",
-			args: args{"testBoolOff"},
-			want: false,
-		},
-		{
-			name: "Wrong",
-			args: args{"testBoolWrong"},
-			want: false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := getBoolProperty(tt.args.name); got != tt.want {
-				t.Errorf("getBoolProperty() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func Test_backupName(t *testing.T) {
 	type args struct {
 		file      string
@@ -339,6 +223,13 @@ func Test_canonize(t *testing.T) {
 }
 
 func Test_saveAndLoadAssoc(t *testing.T) {
+	setUpTestProperties(map[string]string{
+		propPlaybooksDir:          "./test/data/playbooks",
+		propPlaybookCurrent:       "default",
+		propAssocFileKeySeparator: ":",
+		propAssocFileValSeparator: ",",
+	})
+
 	assocFile := getCurrentPlaybookDir() + "/associations/associationsTest.txt"
 	assoc := make(map[string][]string)
 	assoc["aaa"] = []string{"bbb", "ccc"}
@@ -410,6 +301,7 @@ func Test_addBeforeFirstLonger(t *testing.T) {
 	}
 }
 
+// Deprecated: please set props in a separate dir
 func simulateProperty(propName string, value string) {
 	propFile := propertyDir + "/" + propName
 	propFileOrig := propFile + ".orig"
@@ -418,9 +310,10 @@ func simulateProperty(propName string, value string) {
 		os.Rename(propFile, propFileOrig)
 	}
 
-	filePutContents(propFile, value)
+	fileutils.FilePutContents(propFile, value)
 }
 
+// Deprecated: please set props in a separate dir
 func unsimulateProperty(propName string) {
 	propFile := propertyDir + "/" + propName
 	propFileOrig := propFile + ".orig"
@@ -428,6 +321,7 @@ func unsimulateProperty(propName string) {
 	os.Rename(propFileOrig, propFile)
 }
 
+// Deprecated: please set props in a separate dir
 func simulateDefaultAssoc(assoc map[string][]string) {
 	assocFile := getFullAssocFileLocation()
 	assocFileOrig := assocFile + ".orig"
@@ -439,6 +333,7 @@ func simulateDefaultAssoc(assoc map[string][]string) {
 	saveDefaultAssoc(assoc)
 }
 
+// Deprecated: please set props in a separate dir
 func unsimulateDefaultAssoc() {
 	assocFile := getFullAssocFileLocation()
 	assocFileOrig := assocFile + ".orig"
@@ -447,15 +342,18 @@ func unsimulateDefaultAssoc() {
 }
 
 func Test_runAdd(t *testing.T) {
+	setUpTestProperties(map[string]string{
+		propAddValMayEqualKey:     "ON",
+		propAddAutoLowercase:      "ON",
+		propAssocFileKeySeparator: ":",
+		propAssocFileValSeparator: ",",
+		propPlaybookCurrent:       "default",
+		propPlaybooksDir:          "./test/data/playbooks",
+	})
+
 	emptyAssoc := make(map[string][]string)
 	simulateDefaultAssoc(emptyAssoc)
 	defer unsimulateDefaultAssoc()
-
-	simulateProperty(propAddValMayEqualKey, "ON")
-	defer unsimulateProperty(propAddValMayEqualKey)
-
-	simulateProperty(propAddAutoLowercase, "ON")
-	defer unsimulateProperty(propAddAutoLowercase)
 
 	type args struct {
 		a string
@@ -517,6 +415,14 @@ func Test_runAdd(t *testing.T) {
 }
 
 func Test_runAddBoth(t *testing.T) {
+	setUpTestProperties(map[string]string{
+		propAddAutoLowercase:      "ON",
+		propAssocFileKeySeparator: ":",
+		propAssocFileValSeparator: ",",
+		propPlaybookCurrent:       "default",
+		propPlaybooksDir:          "./test/data/playbooks",
+	})
+
 	emptyAssoc := make(map[string][]string)
 	simulateDefaultAssoc(emptyAssoc)
 	defer unsimulateDefaultAssoc()
@@ -566,12 +472,19 @@ func Test_runAddBoth(t *testing.T) {
 }
 
 func Test_runSmartAdd(t *testing.T) {
+	setUpTestProperties(map[string]string{
+		propAddAutoBothMaxlen:     "3",
+		propAddAutoLowercase:      "ON",
+		propAssocFileKeySeparator: ":",
+		propAssocFileValSeparator: ",",
+		propPlaybookCurrent:       "default",
+		propPlaybooksDir:          "./test/data/playbooks",
+		propSolveKubrayaSeparator: "_",
+	})
+
 	emptyAssoc := make(map[string][]string)
 	simulateDefaultAssoc(emptyAssoc)
 	defer unsimulateDefaultAssoc()
-
-	simulateProperty(propAddAutoBothMaxlen, "3")
-	defer unsimulateProperty(propAddAutoBothMaxlen)
 
 	type args struct {
 		a string
@@ -679,6 +592,13 @@ func Test_removeByValue(t *testing.T) {
 }
 
 func Test_runRemove(t *testing.T) {
+	setUpTestProperties(map[string]string{
+		propAssocFileKeySeparator: ":",
+		propAssocFileValSeparator: ",",
+		propPlaybookCurrent:       "default",
+		propPlaybooksDir:          "./test/data/playbooks",
+	})
+
 	assoc := make(map[string][]string)
 	assoc["boy"] = []string{"girl", "man", "child"}
 	assoc["girl"] = []string{"woman"}
@@ -746,6 +666,13 @@ func Test_runRemove(t *testing.T) {
 }
 
 func Test_runRemoveBoth(t *testing.T) {
+	setUpTestProperties(map[string]string{
+		propAssocFileKeySeparator: ":",
+		propAssocFileValSeparator: ",",
+		propPlaybookCurrent:       "default",
+		propPlaybooksDir:          "./test/data/playbooks",
+	})
+
 	assoc := make(map[string][]string)
 	assoc["from"] = []string{"to", "subject", "cc"}
 	assoc["to"] = []string{"from"}
@@ -793,6 +720,13 @@ func Test_runRemoveBoth(t *testing.T) {
 }
 
 func Test_runView(t *testing.T) {
+	setUpTestProperties(map[string]string{
+		propAssocFileKeySeparator: ":",
+		propAssocFileValSeparator: ",",
+		propPlaybookCurrent:       "default",
+		propPlaybooksDir:          "./test/data/playbooks",
+	})
+
 	assoc := make(map[string][]string)
 	assoc["boy"] = []string{"girl", "man", "child"}
 	assoc["girl"] = []string{"woman"}
@@ -834,12 +768,15 @@ func Test_runView(t *testing.T) {
 }
 
 func Test_loadDicts(t *testing.T) {
-	simulateProperty(propDictsExt, ".test")
-	defer unsimulateProperty(propDictsExt)
+	setUpTestProperties(map[string]string{
+		propPlaybookCurrent: "default",
+		propPlaybooksDir:    "./test/data/playbooks",
+		propDictsExt:        ".test",
+	})
 
 	dictsDir := getFullDictsDir()
-	filePutContents(dictsDir+"/"+"dict.test", "aa\nbb")
-	defer fileRemove(dictsDir + "/" + "dict.test")
+	fileutils.FilePutContents(dictsDir+"/"+"dict.test", "aa\nbb")
+	defer fileutils.FileRemove(dictsDir + "/" + "dict.test")
 
 	tests := []struct {
 		name string
@@ -964,14 +901,19 @@ func Test_combinations(t *testing.T) {
 }
 
 func Test_runSolve(t *testing.T) {
-	simulateProperty(propDictsExt, ".test")
-	defer unsimulateProperty(propDictsExt)
-
-	simulateProperty(propSolveMaxResults, "3")
-	defer unsimulateProperty(propSolveMaxResults)
+	setUpTestProperties(map[string]string{
+		propAddAutoLowercase:      "ON",
+		propAssocFileKeySeparator: ":",
+		propAssocFileValSeparator: ",",
+		propPlaybookCurrent:       "default",
+		propPlaybooksDir:          "./test/data/playbooks",
+		propDictsExt:              ".test",
+		propSolveKubrayaSeparator: "_",
+		propSolveMaxResults:       "3",
+	})
 
 	dictsDir := getFullDictsDir()
-	filePutContents(dictsDir+"/"+"dict.test", strings.Join(
+	fileutils.FilePutContents(dictsDir+"/"+"dict.test", strings.Join(
 		[]string{
 			"boycott",
 			"copy",
@@ -983,14 +925,14 @@ func Test_runSolve(t *testing.T) {
 			"mn",
 			"ai",
 		}, "\n"))
-	defer fileRemove(dictsDir + "/" + "dict.test")
+	defer fileutils.FileRemove(dictsDir + "/" + "dict.test")
 
-	filePutContents(dictsDir+"/"+"smallDict.test", strings.Join(
+	fileutils.FilePutContents(dictsDir+"/"+"smallDict.test", strings.Join(
 		[]string{
 			"boycott",
 			"copy",
 		}, "\n"))
-	defer fileRemove(dictsDir + "/" + "smallDict.test")
+	defer fileutils.FileRemove(dictsDir + "/" + "smallDict.test")
 
 	assoc := make(map[string][]string)
 	assoc["policeman"] = []string{"cop", "thief"}
@@ -1082,25 +1024,31 @@ func Test_runSolve(t *testing.T) {
 }
 
 func Test_runSearchDict(t *testing.T) {
+	setUpTestProperties(map[string]string{
+		propPlaybookCurrent: "default",
+		propPlaybooksDir:    "./test/data/playbooks",
+		propDictsExt:        ".test",
+	})
+
 	simulateProperty(propDictsExt, ".test")
 	defer unsimulateProperty(propDictsExt)
 
 	dictsDir := getFullDictsDir()
-	filePutContents(dictsDir+"/"+"dict.test", strings.Join(
+	fileutils.FilePutContents(dictsDir+"/"+"dict.test", strings.Join(
 		[]string{
 			"worda",
 			"wordb",
 			"wordc",
 			"wordd",
 		}, "\n"))
-	defer fileRemove(dictsDir + "/" + "dict.test")
+	defer fileutils.FileRemove(dictsDir + "/" + "dict.test")
 
-	filePutContents(dictsDir+"/"+"oddDict.test", strings.Join(
+	fileutils.FilePutContents(dictsDir+"/"+"oddDict.test", strings.Join(
 		[]string{
 			"wordb",
 			"wordd",
 		}, "\n"))
-	defer fileRemove(dictsDir + "/" + "oddDict.test")
+	defer fileutils.FileRemove(dictsDir + "/" + "oddDict.test")
 
 	type args struct {
 		word       string
@@ -1156,6 +1104,10 @@ func Test_runSearchDict(t *testing.T) {
 }
 
 func Test_allowUnknowns(t *testing.T) {
+	setUpTestProperties(map[string]string{
+		propGuessUnknownMarker: "???",
+	})
+
 	type args struct {
 		kubAssoc [][]string
 	}
@@ -1180,11 +1132,14 @@ func Test_allowUnknowns(t *testing.T) {
 }
 
 func Test_searchDictByRegexpGetWords(t *testing.T) {
-	simulateProperty(propDictsExt, ".test")
-	defer unsimulateProperty(propDictsExt)
+	setUpTestProperties(map[string]string{
+		propPlaybookCurrent: "default",
+		propPlaybooksDir:    "./test/data/playbooks",
+		propDictsExt:        ".test",
+	})
 
 	dictsDir := getFullDictsDir()
-	filePutContents(dictsDir+"/"+"dict.test", strings.Join(
+	fileutils.FilePutContents(dictsDir+"/"+"dict.test", strings.Join(
 		[]string{
 			"aabbcc",
 			"abc",
@@ -1194,7 +1149,7 @@ func Test_searchDictByRegexpGetWords(t *testing.T) {
 			"мама",
 			"брат",
 		}, "\n"))
-	defer fileRemove(dictsDir + "/" + "dict.test")
+	defer fileutils.FileRemove(dictsDir + "/" + "dict.test")
 
 	type args struct {
 		re         *regexp.Regexp
@@ -1251,20 +1206,23 @@ func Test_searchDictByRegexpGetWords(t *testing.T) {
 }
 
 func Test_runGuess(t *testing.T) {
-	simulateProperty(propDictsExt, ".test")
-	defer unsimulateProperty(propDictsExt)
-
-	simulateProperty(propGuessMaxResults, "2")
-	defer unsimulateProperty(propGuessMaxResults)
-
-	simulateProperty(propGuessExplainResults, "OFF")
-	defer unsimulateProperty(propGuessExplainResults)
-
-	simulateProperty(propGuessUnknownsLimit, "2")
-	defer unsimulateProperty(propGuessUnknownsLimit)
+	setUpTestProperties(map[string]string{
+		propAddAutoLowercase:      "ON",
+		propAssocFileKeySeparator: ":",
+		propAssocFileValSeparator: ",",
+		propGuessExplainResults:   "OFF",
+		propGuessMaxResults:       "50",
+		propGuessUnknownsLimit:    "2",
+		propGuessUnknownMarker:    "???",
+		propPlaybookCurrent:       "default",
+		propPlaybooksDir:          "./test/data/playbooks",
+		propDictsExt:              ".test",
+		propSolveKubrayaSeparator: "_",
+		propSolveMaxResults:       "2",
+	})
 
 	dictsDir := getFullDictsDir()
-	filePutContents(dictsDir+"/"+"dict.test", strings.Join(
+	fileutils.FilePutContents(dictsDir+"/"+"dict.test", strings.Join(
 		[]string{
 			"boycott",
 			"copy",
@@ -1273,7 +1231,7 @@ func Test_runGuess(t *testing.T) {
 			"boyscout",
 			"cowboy",
 		}, "\n"))
-	defer fileRemove(dictsDir + "/" + "dict.test")
+	defer fileutils.FileRemove(dictsDir + "/" + "dict.test")
 
 	assoc := make(map[string][]string)
 	assoc["policeman"] = []string{"cop", "thief"}
@@ -1368,6 +1326,10 @@ func Test_runGuess(t *testing.T) {
 }
 
 func Test_countUnknownsInWord(t *testing.T) {
+	setUpTestProperties(map[string]string{
+		propGuessUnknownMarker: "???",
+	})
+
 	type args struct {
 		word string
 	}
@@ -1397,6 +1359,10 @@ func Test_countUnknownsInWord(t *testing.T) {
 }
 
 func Test_sortByUnknownsInWord(t *testing.T) {
+	setUpTestProperties(map[string]string{
+		propGuessUnknownMarker: "???",
+	})
+
 	type args struct {
 		words []string
 	}

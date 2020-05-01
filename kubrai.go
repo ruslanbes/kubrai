@@ -6,27 +6,30 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/ruslanbes/kubrai/property"
 )
 
 // verbs
 const (
-	vAdd         = "add"
-	vAddBoth     = "addboth"
-	vAddSolution = "addsolution"
-	vGuess       = "guess"
-	vHint        = "hint"
-	vPlay        = "play"
-	vPlaybook    = "playbook"
-	vRemove      = "remove"
-	vRemoveBoth  = "removeboth"
-	vSearchDict  = "searchdict"
-	vSolve       = "solve"
-	vUndo        = "undo"
-	vView        = "view"
+	vAdd         = "add"         // assoc add
+	vAddBoth     = "addboth"     // assoc addboth
+	vAddSolution = "addsolution" // assoc addsolution
+	vGuess       = "guess"       // playbook guess
+	vHint        = "hint"        // playbook hint
+	vPlay        = "play"        // playbook play
+	vPlaybook    = "playbook"    // playbook view/set/list
+	vRemove      = "remove"      // assoc remove
+	vRemoveBoth  = "removeboth"  // assoc removeboth
+	vSearchDict  = "searchdict"  // dict search
+	vSolve       = "solve"       // playbook solve
+	vUndo        = "undo"        // assoc undo
+	vView        = "view"        // assoc view
 )
 
 const propertyDir = "./properties"
@@ -37,9 +40,7 @@ const (
 	propAddAutoLowercase            = "AddAutoLowercase"
 	propAddValMayEqualKey           = "AddValMayEqualKey"
 	propAssocFileKeySeparator       = "AssocFileKeySeparator"
-	propAssocFileLocation           = "AssocFileLocation"
 	propAssocFileValSeparator       = "AssocFileValSeparator"
-	propDictsDir                    = "DictsDir"
 	propDictsExt                    = "DictsExt"
 	propGuessExplainResults         = "GuessExplainResults"
 	propGuessMaxResults             = "GuessMaxResults"
@@ -117,7 +118,7 @@ func guessViewVerb(args []string) string {
 }
 
 func isKubraya(str string) bool {
-	return strings.Contains(str, "_")
+	return strings.Contains(str, property.AsString(propSolveKubrayaSeparator))
 }
 
 func parseVerb(args []string) string {
@@ -146,52 +147,8 @@ func extractNouns(verb string, args []string) []string {
 	return filterOut(verb, args)
 }
 
-func warnFileReadError(err error) {
-	log.Println(fmt.Errorf("WARN : File read error: %s", err))
-}
-
-func getStringProperty(name string) string {
-	bs, err := ioutil.ReadFile(propertyDir + "/" + name)
-	if err != nil {
-		warnFileReadError(err)
-		return ""
-	}
-	str := strings.Trim(string(bs), " \n")
-
-	return str
-}
-
-func warnConvertToIntError(err error) {
-	log.Println(fmt.Errorf("WARN : Convert to int error: %s", err))
-}
-
-func getByteProperty(name string) byte {
-	return byte(getIntProperty(name))
-}
-
-func getIntProperty(name string) int {
-	num, err := strconv.ParseInt(getStringProperty(name), 10, 64)
-	if err != nil {
-		warnConvertToIntError(err)
-		return 0
-	}
-	return int(num)
-}
-
 func warnNonBool(b string) {
 	log.Println(fmt.Errorf("WARN : Non-bool: %s", b))
-}
-
-func getBoolProperty(name string) bool {
-	b := strings.Trim(getStringProperty(name), " ")
-	if b == "ON" {
-		return true
-	} else if b == "OFF" {
-		return false
-	} else {
-		warnNonBool(b)
-		return false
-	}
 }
 
 func checkError(e error) {
@@ -207,8 +164,8 @@ func loadAssoc(assocFile string) map[string][]string {
 
 	assoc := make(map[string][]string)
 
-	keySep := getStringProperty(propAssocFileKeySeparator)
-	valSep := getStringProperty(propAssocFileValSeparator)
+	keySep := property.AsString(propAssocFileKeySeparator)
+	valSep := property.AsString(propAssocFileValSeparator)
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		keyVals := strings.Split(scanner.Text(), keySep)
@@ -249,12 +206,13 @@ func canonize(word string) string {
 }
 
 func buildAssocString(word string, assocSingle []string) string {
-	return word + getStringProperty(propAssocFileKeySeparator) + strings.Join(assocSingle, getStringProperty(propAssocFileValSeparator))
+	return word + property.AsString(propAssocFileKeySeparator) + strings.Join(assocSingle, property.AsString(propAssocFileValSeparator))
 }
 
 func saveAssoc(assocFile string, assoc map[string][]string) {
 	backupFile(assocFile)
 
+	os.MkdirAll(filepath.Dir(assocFile), 0777)
 	f, err := os.Create(assocFile)
 	checkError(err)
 	defer f.Close()
@@ -265,7 +223,7 @@ func saveAssoc(assocFile string, assoc map[string][]string) {
 }
 
 func getFullAssocFileLocation() string {
-	assocFileLocation := getStringProperty(propAssocFileLocation)
+	assocFileLocation := "associations/associations.txt"
 	playbookDir := getCurrentPlaybookDir()
 
 	return playbookDir + "/" + assocFileLocation
@@ -303,15 +261,15 @@ func addBeforeFirstLonger(s string, slc []string) []string {
 	return res
 }
 
-func runAdd(a string, b string) []string {
+func runAdd(a, b string) []string {
 	assoc := loadDefaultAssoc()
 
-	if getBoolProperty(propAddAutoLowercase) {
+	if property.AsBool(propAddAutoLowercase) {
 		a = strings.ToLower(a)
 		b = strings.ToLower(b)
 	}
 
-	if a != b || a == b && getBoolProperty(propAddValMayEqualKey) {
+	if a != b || a == b && property.AsBool(propAddValMayEqualKey) {
 		assoc[a] = addBeforeFirstLonger(b, assoc[a])
 		saveDefaultAssoc(assoc)
 	}
@@ -319,14 +277,14 @@ func runAdd(a string, b string) []string {
 	return assoc[a]
 }
 
-func runAddBoth(a string, b string) [2][]string {
+func runAddBoth(a, b string) [2][]string {
 	var res [2][]string
 	res[0] = runAdd(a, b)
 	res[1] = runAdd(b, a)
 	return res
 }
 
-func runAddSolution(src string, target string) map[string][]string {
+func runAddSolution(src, target string) map[string][]string {
 	partsSrc := splitKubraya(src)
 	partsTarget := splitKubraya(target)
 	if len(partsSrc) != len(partsTarget) {
@@ -345,12 +303,12 @@ func runAddSolution(src string, target string) map[string][]string {
 	return res
 }
 
-func runSmartAdd(a string, b string) map[string][]string {
+func runSmartAdd(a, b string) map[string][]string {
 	if isKubraya(a) && isKubraya(b) {
 		return runAddSolution(a, b)
 	}
 
-	if len([]rune(a)) <= getIntProperty(propAddAutoBothMaxlen) {
+	if len([]rune(a)) <= property.AsInt(propAddAutoBothMaxlen) {
 		tmp := runAddBoth(a, b)
 		res := map[string][]string{}
 		res[a] = tmp[0]
@@ -372,7 +330,7 @@ func removeByValue(s string, slc []string) []string {
 	return slc
 }
 
-func runRemove(a string, b string) []string {
+func runRemove(a, b string) []string {
 	assoc := loadDefaultAssoc()
 	if assoca, ok := assoc[a]; ok {
 		assoca = removeByValue(b, assoca)
@@ -388,7 +346,7 @@ func runRemove(a string, b string) []string {
 	return []string{}
 }
 
-func runRemoveBoth(a string, b string) [2][]string {
+func runRemoveBoth(a, b string) [2][]string {
 	var res [2][]string
 	res[0] = runRemove(a, b)
 	res[1] = runRemove(b, a)
@@ -434,21 +392,21 @@ func readFileToSlice(file string, cap int) []string {
 }
 
 func getCurrentPlaybookDir() string {
-	playbook := getStringProperty(propPlaybookCurrent)
-	playbooksDir := getStringProperty(propPlaybooksDir)
+	playbook := property.AsString(propPlaybookCurrent)
+	playbooksDir := property.AsString(propPlaybooksDir)
 
 	return playbooksDir + "/" + playbook
 }
 
 func getFullDictsDir() string {
-	dictsDir := getStringProperty(propDictsDir)
+	dictsDir := "dicts"
 	playbookDir := getCurrentPlaybookDir()
 	return playbookDir + "/" + dictsDir
 }
 
 func loadDicts() map[string][]string {
 	dictsDir := getFullDictsDir()
-	dictsExt := getStringProperty(propDictsExt)
+	dictsExt := property.AsString(propDictsExt)
 	lenExt := len(dictsExt)
 	list := readDirNames(dictsDir)
 
@@ -465,15 +423,15 @@ func loadDicts() map[string][]string {
 }
 
 func splitKubraya(kubraya string) []string {
-	if getBoolProperty(propAddAutoLowercase) {
+	if property.AsBool(propAddAutoLowercase) {
 		kubraya = strings.ToLower(kubraya)
 	}
 
-	kubSep := getStringProperty(propSolveKubrayaSeparator)
+	kubSep := property.AsString(propSolveKubrayaSeparator)
 	return strings.Split(kubraya, kubSep)
 }
 
-func nextMultiDimValue(counter []int, maxCounter []int) ([]int, bool) {
+func nextMultiDimValue(counter, maxCounter []int) ([]int, bool) {
 	if len(counter) != len(maxCounter) {
 		log.Println(fmt.Errorf("WARN : Counter length is incorrect: %d != %d", len(counter), len(maxCounter)))
 	}
@@ -613,7 +571,7 @@ func combsOfKubraya(kubraya string) ([][]string, bool) {
 }
 
 func runSolve(kubraya string) ([]string, bool) {
-	maxResults := getIntProperty(propSolveMaxResults)
+	maxResults := property.AsInt(propSolveMaxResults)
 	results := make(map[string]bool)
 
 	combs, ok := combsOfKubraya(kubraya)
@@ -642,7 +600,7 @@ func runSolve(kubraya string) ([]string, bool) {
 }
 
 func allowUnknowns(kubAssoc [][]string) [][]string {
-	guessUnknownMarker := getStringProperty(propGuessUnknownMarker)
+	guessUnknownMarker := property.AsString(propGuessUnknownMarker)
 
 	for i, list := range kubAssoc {
 		if len(list) == 0 {
@@ -656,7 +614,7 @@ func allowUnknowns(kubAssoc [][]string) [][]string {
 }
 
 func wordGuessToRegexp(wordGuess string) string {
-	guessUnknownMarker := getStringProperty(propGuessUnknownMarker)
+	guessUnknownMarker := property.AsString(propGuessUnknownMarker)
 
 	return "^" + strings.ReplaceAll(wordGuess, guessUnknownMarker, ".+") + "$"
 }
@@ -673,8 +631,8 @@ func countValsInSlice(slc []string, val string) int {
 }
 
 func isCombGuessable(comb []string) bool {
-	guessUnknownMarker := getStringProperty(propGuessUnknownMarker)
-	guessUnknownsLimit := getIntProperty(propGuessUnknownsLimit)
+	guessUnknownMarker := property.AsString(propGuessUnknownMarker)
+	guessUnknownsLimit := property.AsInt(propGuessUnknownsLimit)
 
 	unk := countValsInSlice(comb, guessUnknownMarker)
 
@@ -696,7 +654,7 @@ func filterGuessableCombs(combs [][]string) [][]string {
 }
 
 func countUnknowns(comb []string) int {
-	guessUnknownMarker := getStringProperty(propGuessUnknownMarker)
+	guessUnknownMarker := property.AsString(propGuessUnknownMarker)
 	return countValsInSlice(comb, guessUnknownMarker)
 }
 
@@ -709,7 +667,7 @@ func sortCombsByBestChances(combs [][]string) [][]string {
 }
 
 func countUnknownsInWord(word string) int {
-	guessUnknownMarker := getStringProperty(propGuessUnknownMarker)
+	guessUnknownMarker := property.AsString(propGuessUnknownMarker)
 	return strings.Count(word, guessUnknownMarker)
 }
 
@@ -733,10 +691,10 @@ func runGuess(kubraya string) ([]string, bool) {
 	combs = filterGuessableCombs(combs)
 	combs = sortCombsByBestChances(combs)
 
-	maxResults := getIntProperty(propGuessMaxResults)
+	maxResults := property.AsInt(propGuessMaxResults)
 	results := make(map[string]bool)
 	explains := make(map[string]string)
-	guessExplainResults := getBoolProperty(propGuessExplainResults)
+	guessExplainResults := property.AsBool(propGuessExplainResults)
 	for _, comb := range combs {
 		wordGuess := strings.Join(comb, "")
 		wordRegexp := wordGuessToRegexp(wordGuess)
@@ -779,8 +737,8 @@ func runGuess(kubraya string) ([]string, bool) {
 }
 
 func runListPlaybooks() []string {
-	playbooksDir := getStringProperty(propPlaybooksDir)
-	playbookCurrent := getStringProperty(propPlaybookCurrent)
+	playbooksDir := property.AsString(propPlaybooksDir)
+	playbookCurrent := property.AsString(propPlaybookCurrent)
 
 	res := []string{}
 	files, err := ioutil.ReadDir(playbooksDir)
@@ -844,7 +802,7 @@ func runCommand(verb string, nouns []string) string {
 		res := runListPlaybooks()
 		return strings.Join(res, "\n")
 	case vSearchDict:
-		res := runSearchDict(nouns[0], getIntProperty(propSearchDictDefaultMaxResults))
+		res := runSearchDict(nouns[0], property.AsInt(propSearchDictDefaultMaxResults))
 		if len(res) == 0 {
 			return "404 NOT FOUND"
 		}
@@ -869,6 +827,7 @@ func runCommand(verb string, nouns []string) string {
 }
 
 func main() {
+	property.PropertyDir = "./property/properties"
 	verb := parseVerb(os.Args[1:])
 	if verb == "" {
 		answer := "400 BAD REQUEST"
