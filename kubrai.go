@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"os/user"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -826,8 +827,39 @@ func runCommand(verb string, nouns []string) string {
 	}
 }
 
+func getWd() string {
+	ex, err := os.Executable()
+	if err != nil {
+		panic(err)
+	}
+	return filepath.Dir(ex)
+}
+
+func getHomeDir() string {
+	usr, err := user.Current()
+	if err != nil {
+		log.Fatal(err)
+	}
+	return usr.HomeDir
+}
+
+func autoDetectPropertiesPath() string {
+	postfix := "/property/properties"
+	paths := [2]string{}
+	paths[0] = getWd() + postfix
+	paths[1] = getHomeDir() + "/.kubrai" + postfix
+
+	for _, p := range paths {
+		if stat, err := os.Stat(p); err == nil && stat.IsDir() {
+			return paths[0]
+		}
+	}
+	log.Fatal("No Properties dir detected")
+	return ""
+}
+
 func main() {
-	property.PropertyDir = "./property/properties"
+	property.PropertiesPath = autoDetectPropertiesPath()
 	verb := parseVerb(os.Args[1:])
 	if verb == "" {
 		answer := "400 BAD REQUEST"

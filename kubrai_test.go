@@ -16,7 +16,7 @@ func setUpTestProperties(props map[string]string) {
 	os.RemoveAll(testPropertyDir)
 	os.Mkdir(testPropertyDir, 0777)
 
-	property.PropertyDir = testPropertyDir
+	property.PropertiesPath = testPropertyDir
 	property.SetProperties(props)
 }
 

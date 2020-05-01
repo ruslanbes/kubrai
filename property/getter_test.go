@@ -7,14 +7,14 @@ import (
 )
 
 func TestAsInt(t *testing.T) {
-	fileutils.FilePutContents(PropertyDir+"/testIntNeg", "-42")
-	defer fileutils.FileRemove(PropertyDir + "/testIntNeg")
+	fileutils.FilePutContents(PropertiesPath+"/testIntNeg", "-42")
+	defer fileutils.FileRemove(PropertiesPath + "/testIntNeg")
 
-	fileutils.FilePutContents(PropertyDir+"/testIntZero", "0")
-	defer fileutils.FileRemove(PropertyDir + "/testIntZero")
+	fileutils.FilePutContents(PropertiesPath+"/testIntZero", "0")
+	defer fileutils.FileRemove(PropertiesPath + "/testIntZero")
 
-	fileutils.FilePutContents(PropertyDir+"/testIntPos", "42")
-	defer fileutils.FileRemove(PropertyDir + "/testIntPos")
+	fileutils.FilePutContents(PropertiesPath+"/testIntPos", "42")
+	defer fileutils.FileRemove(PropertiesPath + "/testIntPos")
 
 	type args struct {
 		name string
@@ -55,14 +55,14 @@ func TestAsInt(t *testing.T) {
 }
 
 func TestAsBool(t *testing.T) {
-	fileutils.FilePutContents(PropertyDir+"/testBoolOn", "ON")
-	defer fileutils.FileRemove(PropertyDir + "/testBoolOn")
+	fileutils.FilePutContents(PropertiesPath+"/testBoolOn", "ON")
+	defer fileutils.FileRemove(PropertiesPath + "/testBoolOn")
 
-	fileutils.FilePutContents(PropertyDir+"/testBoolOff", "OFF")
-	defer fileutils.FileRemove(PropertyDir + "/testBoolOff")
+	fileutils.FilePutContents(PropertiesPath+"/testBoolOff", "OFF")
+	defer fileutils.FileRemove(PropertiesPath + "/testBoolOff")
 
-	fileutils.FilePutContents(PropertyDir+"/testBoolWrong", "Wrong")
-	defer fileutils.FileRemove(PropertyDir + "/testBoolWrong")
+	fileutils.FilePutContents(PropertiesPath+"/testBoolWrong", "Wrong")
+	defer fileutils.FileRemove(PropertiesPath + "/testBoolWrong")
 
 	type args struct {
 		name string

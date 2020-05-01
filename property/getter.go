@@ -6,13 +6,13 @@ import (
 	"strings"
 )
 
-// PropertyDir is the location where to look for property files
-var PropertyDir = "./properties"
+// PropertiesPath is the location where to look for property files.
+var PropertiesPath = "./properties"
 
 // AsString gets property as string.
 // On error: warn and return empty string
 func AsString(name string) string {
-	bs, err := ioutil.ReadFile(PropertyDir + "/" + name)
+	bs, err := ioutil.ReadFile(PropertiesPath + "/" + name)
 	if err != nil {
 		warnFileReadError(err)
 		return ""

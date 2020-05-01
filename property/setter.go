@@ -10,5 +10,5 @@ func SetProperties(props map[string]string) {
 }
 
 func setStringProperty(name, value string) {
-	fileutils.FilePutContents(PropertyDir+"/"+name, value)
+	fileutils.FilePutContents(PropertiesPath+"/"+name, value)
 }
