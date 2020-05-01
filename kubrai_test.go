@@ -60,8 +60,6 @@ func Test_findExactVerb(t *testing.T) {
 }
 
 func Test_guessVerb(t *testing.T) {
-	setUpTestProperties(map[string]string{propSolveKubrayaSeparator: "_"})
-
 	type args struct {
 		args []string
 	}
@@ -129,7 +127,9 @@ func Test_parseVerb(t *testing.T) {
 	}
 }
 
-func Test_extractNouns(t *testing.T) {
+func Test_extractArgs(t *testing.T) {
+	setUpTestProperties(map[string]string{propArgsAutoLowercase: "ON"})
+
 	type args struct {
 		word  string
 		words []string
@@ -143,7 +143,7 @@ func Test_extractNouns(t *testing.T) {
 			name: "One",
 			args: args{
 				word:  "one",
-				words: []string{"one", "two"},
+				words: []string{"One", "two"},
 			},
 			want: []string{"two"},
 		},
@@ -151,7 +151,7 @@ func Test_extractNouns(t *testing.T) {
 			name: "Many",
 			args: args{
 				word:  "one",
-				words: []string{"one", "two", "one"},
+				words: []string{"one", "Two", "one"},
 			},
 			want: []string{"two"},
 		},
@@ -166,8 +166,8 @@ func Test_extractNouns(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := extractNouns(tt.args.word, tt.args.words); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("extractNouns() = %v, want %v", got, tt.want)
+			if got := extractArgs(tt.args.word, tt.args.words); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("extractArgs() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -304,7 +304,6 @@ func Test_addBeforeFirstLonger(t *testing.T) {
 func Test_runAdd(t *testing.T) {
 	setUpTestProperties(map[string]string{
 		propAddValMayEqualKey:     "ON",
-		propAddAutoLowercase:      "ON",
 		propAssocFileKeySeparator: ":",
 		propAssocFileValSeparator: ",",
 		propPlaybookCurrent:       "default",
@@ -324,12 +323,12 @@ func Test_runAdd(t *testing.T) {
 	}{
 		{
 			name: "Test01",
-			args: args{"Boy", "Girl"},
+			args: args{"boy", "girl"},
 			want: []string{"girl"},
 		},
 		{
 			name: "Test02",
-			args: args{"boy", "MAN"},
+			args: args{"boy", "man"},
 			want: []string{"man", "girl"},
 		},
 		{
@@ -339,17 +338,17 @@ func Test_runAdd(t *testing.T) {
 		},
 		{
 			name: "Test04",
-			args: args{"BOY", "child"},
+			args: args{"boy", "child"},
 			want: []string{"man", "girl", "child"},
 		},
 		{
 			name: "Test05",
-			args: args{"math", "ScIeNcE"},
+			args: args{"math", "science"},
 			want: []string{"science"},
 		},
 		{
 			name: "Test06",
-			args: args{"math", "philosophY"},
+			args: args{"math", "philosophy"},
 			want: []string{"science", "philosophy"},
 		},
 		{
@@ -374,7 +373,6 @@ func Test_runAdd(t *testing.T) {
 
 func Test_runAddBoth(t *testing.T) {
 	setUpTestProperties(map[string]string{
-		propAddAutoLowercase:      "ON",
 		propAssocFileKeySeparator: ":",
 		propAssocFileValSeparator: ",",
 		propPlaybookCurrent:       "default",
@@ -430,12 +428,10 @@ func Test_runAddBoth(t *testing.T) {
 func Test_runSmartAdd(t *testing.T) {
 	setUpTestProperties(map[string]string{
 		propAddAutoBothMaxlen:     "3",
-		propAddAutoLowercase:      "ON",
 		propAssocFileKeySeparator: ":",
 		propAssocFileValSeparator: ",",
 		propPlaybookCurrent:       "default",
 		propPlaybooksDir:          "./test/data/playbooks",
-		propSolveKubrayaSeparator: "_",
 	})
 
 	saveDefaultAssoc(map[string][]string{})
@@ -853,13 +849,11 @@ func Test_combinations(t *testing.T) {
 
 func Test_runSolve(t *testing.T) {
 	setUpTestProperties(map[string]string{
-		propAddAutoLowercase:      "ON",
 		propAssocFileKeySeparator: ":",
 		propAssocFileValSeparator: ",",
 		propPlaybookCurrent:       "default",
 		propPlaybooksDir:          "./test/data/playbooks",
 		propDictsExt:              ".test",
-		propSolveKubrayaSeparator: "_",
 		propSolveMaxResults:       "3",
 	})
 
@@ -927,25 +921,25 @@ func Test_runSolve(t *testing.T) {
 		},
 		{
 			name:  "Test03",
-			args:  args{"period_out_&T_and"},
+			args:  args{"period_out_&t_and"},
 			want:  []string{"terminator"},
 			want1: true,
 		},
 		{
 			name:  "Test04",
-			args:  args{"AMATEUR_PSI_6_THANKS"},
+			args:  args{"amateur_psi_6_thanks"},
 			want:  []string{"proximity"},
 			want1: true,
 		},
 		{
 			name:  "Test05",
-			args:  args{"AMATEUR_PSI_NONEXISTENTWORD_THANKS"},
+			args:  args{"amateur_psi_nonexistentword_thanks"},
 			want:  []string{},
 			want1: false,
 		},
 		{
 			name:  "Test05",
-			args:  args{"AMATEUR_PSI_WHY_THANKS"},
+			args:  args{"amateur_psi_why_thanks"},
 			want:  []string{},
 			want1: false,
 		},
@@ -962,15 +956,17 @@ func Test_runSolve(t *testing.T) {
 		})
 	}
 
-	// test limit
-	got, got1 := runSolve("MAX_MIN")
-	if !got1 {
-		t.Errorf("runSolve() got1 = %v, want %v", got1, true)
-	}
+	t.Run("limit", func(t *testing.T) {
+		got, got1 := runSolve("max_min")
+		if !got1 {
+			t.Errorf("runSolve() got1 = %v, want %v", got1, true)
+		}
 
-	if len(got) != 3 {
-		t.Errorf("runSolve() got = %v, want slice size 3", got)
-	}
+		sliceSize := 3
+		if len(got) != sliceSize {
+			t.Errorf("runSolve() got = %v, want slice size %d", got, sliceSize)
+		}
+	})
 }
 
 func Test_runSearchDict(t *testing.T) {
@@ -1154,7 +1150,6 @@ func Test_searchDictByRegexpGetWords(t *testing.T) {
 
 func Test_runGuess(t *testing.T) {
 	setUpTestProperties(map[string]string{
-		propAddAutoLowercase:      "ON",
 		propAssocFileKeySeparator: ":",
 		propAssocFileValSeparator: ",",
 		propGuessExplainResults:   "OFF",
@@ -1164,7 +1159,6 @@ func Test_runGuess(t *testing.T) {
 		propPlaybookCurrent:       "default",
 		propPlaybooksDir:          "./test/data/playbooks",
 		propDictsExt:              ".test",
-		propSolveKubrayaSeparator: "_",
 		propSolveMaxResults:       "2",
 	})
 
@@ -1211,37 +1205,31 @@ func Test_runGuess(t *testing.T) {
 		},
 		{
 			name:  "Test03",
-			args:  args{"period_out_&T_and"},
+			args:  args{"period_out_&t_and"},
 			want:  []string{"terminator"},
 			want1: true,
 		},
 		{
 			name:  "Test04",
-			args:  args{"AMATEUR_PSI_6_THANKS"},
-			want:  []string{"proximity"},
-			want1: true,
-		},
-		{
-			name:  "Test05",
-			args:  args{"AMATEUR_PSI_6_THANKS"},
+			args:  args{"amateur_psi_6_thanks"},
 			want:  []string{"proximity"},
 			want1: true,
 		},
 		{
 			name:  "Test05a",
-			args:  args{"AMATEUR_PSI_NONEXISTENTWORD_THANKS"},
+			args:  args{"amateur_psi_nonexistentword_thanks"},
 			want:  []string{"proximity"},
 			want1: true,
 		},
 		{
 			name:  "Test05b",
-			args:  args{"AMATEUR_PSI_THANKS_NONEXISTENTWORD"},
+			args:  args{"amateur_psi_thanks_nonexistentword"},
 			want:  []string{},
 			want1: false,
 		},
 		{
 			name:  "Test06",
-			args:  args{"AMATEUR_PSI_TEA_THANKS"},
+			args:  args{"amateur_psi_tea_thanks"},
 			want:  []string{"proximity"},
 			want1: true,
 		},

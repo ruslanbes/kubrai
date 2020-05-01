@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ruslanbes/kubrai/kubraya"
 	"github.com/ruslanbes/kubrai/property"
 )
 
@@ -38,7 +39,7 @@ const propertyDir = "./properties"
 // properties
 const (
 	propAddAutoBothMaxlen           = "AddAutoBothMaxlen"
-	propAddAutoLowercase            = "AddAutoLowercase"
+	propArgsAutoLowercase           = "ArgsAutoLowercase"
 	propAddValMayEqualKey           = "AddValMayEqualKey"
 	propAssocFileKeySeparator       = "AssocFileKeySeparator"
 	propAssocFileValSeparator       = "AssocFileValSeparator"
@@ -52,7 +53,6 @@ const (
 	propSearchDictDefaultMaxResults = "SearchDictDefaultMaxResults"
 	propSolveAutoGuess              = "SolveAutoGuess"
 	propSolveMaxResults             = "SolveMaxResults"
-	propSolveKubrayaSeparator       = "SolveKubrayaSeparator"
 )
 
 func findExactVerb(args []string) string {
@@ -103,7 +103,7 @@ func guessPlayVerb(args []string) string {
 }
 
 func guessSolveVerb(args []string) string {
-	if len(args) == 1 && isKubraya(args[0]) {
+	if len(args) == 1 && kubraya.IsKubraya(args[0]) {
 		return vSolve
 	}
 
@@ -111,15 +111,11 @@ func guessSolveVerb(args []string) string {
 }
 
 func guessViewVerb(args []string) string {
-	if len(args) == 1 && !isKubraya(args[0]) {
+	if len(args) == 1 && !kubraya.IsKubraya(args[0]) {
 		return vView
 	}
 
 	return ""
-}
-
-func isKubraya(str string) bool {
-	return strings.Contains(str, property.AsString(propSolveKubrayaSeparator))
 }
 
 func parseVerb(args []string) string {
@@ -144,12 +140,14 @@ func filterOut(word string, words []string) []string {
 	return words[:n]
 }
 
-func extractNouns(verb string, args []string) []string {
-	return filterOut(verb, args)
-}
+func extractArgs(verb string, args []string) []string {
+	if property.AsBool(propArgsAutoLowercase) {
+		for i, v := range args {
+			args[i] = strings.ToLower(v)
+		}
+	}
 
-func warnNonBool(b string) {
-	log.Println(fmt.Errorf("WARN : Non-bool: %s", b))
+	return filterOut(verb, args)
 }
 
 func checkError(e error) {
@@ -265,11 +263,6 @@ func addBeforeFirstLonger(s string, slc []string) []string {
 func runAdd(a, b string) []string {
 	assoc := loadDefaultAssoc()
 
-	if property.AsBool(propAddAutoLowercase) {
-		a = strings.ToLower(a)
-		b = strings.ToLower(b)
-	}
-
 	if a != b || a == b && property.AsBool(propAddValMayEqualKey) {
 		assoc[a] = addBeforeFirstLonger(b, assoc[a])
 		saveDefaultAssoc(assoc)
@@ -286,8 +279,8 @@ func runAddBoth(a, b string) [2][]string {
 }
 
 func runAddSolution(src, target string) map[string][]string {
-	partsSrc := splitKubraya(src)
-	partsTarget := splitKubraya(target)
+	partsSrc := kubraya.SplitKubraya(src)
+	partsTarget := kubraya.SplitKubraya(target)
 	if len(partsSrc) != len(partsTarget) {
 		log.Fatal("nothing")
 	}
@@ -305,7 +298,7 @@ func runAddSolution(src, target string) map[string][]string {
 }
 
 func runSmartAdd(a, b string) map[string][]string {
-	if isKubraya(a) && isKubraya(b) {
+	if kubraya.IsKubraya(a) && kubraya.IsKubraya(b) {
 		return runAddSolution(a, b)
 	}
 
@@ -423,15 +416,6 @@ func loadDicts() map[string][]string {
 	return dicts
 }
 
-func splitKubraya(kubraya string) []string {
-	if property.AsBool(propAddAutoLowercase) {
-		kubraya = strings.ToLower(kubraya)
-	}
-
-	kubSep := property.AsString(propSolveKubrayaSeparator)
-	return strings.Split(kubraya, kubSep)
-}
-
 func nextMultiDimValue(counter, maxCounter []int) ([]int, bool) {
 	if len(counter) != len(maxCounter) {
 		log.Println(fmt.Errorf("WARN : Counter length is incorrect: %d != %d", len(counter), len(maxCounter)))
@@ -532,8 +516,8 @@ func mapKeys(m map[string]bool) []string {
 	return keys
 }
 
-func buildKubAssoc(kubraya string) ([][]string, bool) {
-	kubParts := splitKubraya(kubraya)
+func buildKubAssoc(input string) ([][]string, bool) {
+	kubParts := kubraya.SplitKubraya(input)
 
 	kubAssoc := make([][]string, len(kubParts))
 	for i, part := range kubParts {
@@ -546,8 +530,8 @@ func buildKubAssoc(kubraya string) ([][]string, bool) {
 	return kubAssoc, true
 }
 
-func buildKubAssocComplete(kubraya string) ([][]string, bool) {
-	kubParts := splitKubraya(kubraya)
+func buildKubAssocComplete(input string) ([][]string, bool) {
+	kubParts := kubraya.SplitKubraya(input)
 
 	complete := true
 	kubAssoc := make([][]string, len(kubParts))
@@ -769,41 +753,41 @@ func findStringInSlice(str string, strings []string) int {
 	return -1
 }
 
-func runCommand(verb string, nouns []string) string {
+func runCommand(verb string, args []string) string {
 	switch verb {
 	case vAdd:
-		tmp := runSmartAdd(nouns[0], nouns[1])
+		tmp := runSmartAdd(args[0], args[1])
 		res := []string{}
 		for k, v := range tmp {
 			res = append(res, buildAssocString(k, v))
 		}
 		return strings.Join(res, "\n")
 	case vAddBoth:
-		res := runAddBoth(nouns[0], nouns[1])
-		return buildAssocString(nouns[0], res[0]) + "\n" + buildAssocString(nouns[1], res[1])
+		res := runAddBoth(args[0], args[1])
+		return buildAssocString(args[0], res[0]) + "\n" + buildAssocString(args[1], res[1])
 	case vAddSolution:
-		tmp := runAddSolution(nouns[0], nouns[1])
+		tmp := runAddSolution(args[0], args[1])
 		res := []string{}
 		for k, v := range tmp {
 			res = append(res, buildAssocString(k, v))
 		}
 		return strings.Join(res, "\n")
 	case vGuess:
-		if res, ok := runGuess(nouns[0]); ok {
+		if res, ok := runGuess(args[0]); ok {
 			return strings.Join(res, "\n")
 		}
 		return "404 NOT FOUND"
 	case vRemove:
-		res := runRemove(nouns[0], nouns[1])
-		return buildAssocString(nouns[0], res)
+		res := runRemove(args[0], args[1])
+		return buildAssocString(args[0], res)
 	case vRemoveBoth:
-		res := runRemoveBoth(nouns[0], nouns[1])
-		return buildAssocString(nouns[0], res[0]) + "\n" + buildAssocString(nouns[1], res[1])
+		res := runRemoveBoth(args[0], args[1])
+		return buildAssocString(args[0], res[0]) + "\n" + buildAssocString(args[1], res[1])
 	case vPlaybook:
 		res := runListPlaybooks()
 		return strings.Join(res, "\n")
 	case vSearchDict:
-		res := runSearchDict(nouns[0], property.AsInt(propSearchDictDefaultMaxResults))
+		res := runSearchDict(args[0], property.AsInt(propSearchDictDefaultMaxResults))
 		if len(res) == 0 {
 			return "404 NOT FOUND"
 		}
@@ -814,13 +798,13 @@ func runCommand(verb string, nouns []string) string {
 		}
 		return strings.Join(tmp, "\n")
 	case vSolve:
-		if res, ok := runSolve(nouns[0]); ok {
+		if res, ok := runSolve(args[0]); ok {
 			return strings.Join(res, "\n")
 		}
 		return "404 NOT FOUND"
 	case vView:
-		res := runView(nouns[0])
-		return buildAssocString(nouns[0], res)
+		res := runView(args[0])
+		return buildAssocString(args[0], res)
 	default:
 		msg := fmt.Sprintf("501 NOT IMPLEMENTED\n%s", verb)
 		return msg
@@ -860,13 +844,14 @@ func autoDetectPropertiesPath() string {
 
 func main() {
 	property.PropertiesPath = autoDetectPropertiesPath()
+
 	verb := parseVerb(os.Args[1:])
 	if verb == "" {
 		answer := "400 BAD REQUEST"
 		fmt.Println(answer)
 	} else {
-		nouns := extractNouns(verb, os.Args[1:])
-		answer := runCommand(verb, nouns)
+		args := extractArgs(verb, os.Args[1:])
+		answer := runCommand(verb, args)
 		fmt.Println(answer)
 	}
 }
