@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/ruslanbes/kubrai/fileutils"
-	"github.com/ruslanbes/kubrai/loggersimul"
 )
 
 func TestAsInt(t *testing.T) {
@@ -16,9 +15,6 @@ func TestAsInt(t *testing.T) {
 
 	fileutils.FilePutContents(PropertyDir+"/testIntPos", "42")
 	defer fileutils.FileRemove(PropertyDir + "/testIntPos")
-
-	loggersimul.SimulateLogger()
-	defer loggersimul.UnsimulateLogger()
 
 	type args struct {
 		name string
@@ -67,9 +63,6 @@ func TestAsBool(t *testing.T) {
 
 	fileutils.FilePutContents(PropertyDir+"/testBoolWrong", "Wrong")
 	defer fileutils.FileRemove(PropertyDir + "/testBoolWrong")
-
-	loggersimul.SimulateLogger()
-	defer loggersimul.UnsimulateLogger()
 
 	type args struct {
 		name string

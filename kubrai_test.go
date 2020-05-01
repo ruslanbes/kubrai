@@ -301,46 +301,6 @@ func Test_addBeforeFirstLonger(t *testing.T) {
 	}
 }
 
-// Deprecated: please set props in a separate dir
-func simulateProperty(propName string, value string) {
-	propFile := propertyDir + "/" + propName
-	propFileOrig := propFile + ".orig"
-
-	if _, err := os.Stat(propFileOrig); os.IsNotExist(err) {
-		os.Rename(propFile, propFileOrig)
-	}
-
-	fileutils.FilePutContents(propFile, value)
-}
-
-// Deprecated: please set props in a separate dir
-func unsimulateProperty(propName string) {
-	propFile := propertyDir + "/" + propName
-	propFileOrig := propFile + ".orig"
-
-	os.Rename(propFileOrig, propFile)
-}
-
-// Deprecated: please set props in a separate dir
-func simulateDefaultAssoc(assoc map[string][]string) {
-	assocFile := getFullAssocFileLocation()
-	assocFileOrig := assocFile + ".orig"
-
-	if _, err := os.Stat(assocFileOrig); os.IsNotExist(err) {
-		os.Rename(assocFile, assocFileOrig)
-	}
-
-	saveDefaultAssoc(assoc)
-}
-
-// Deprecated: please set props in a separate dir
-func unsimulateDefaultAssoc() {
-	assocFile := getFullAssocFileLocation()
-	assocFileOrig := assocFile + ".orig"
-
-	os.Rename(assocFileOrig, assocFile)
-}
-
 func Test_runAdd(t *testing.T) {
 	setUpTestProperties(map[string]string{
 		propAddValMayEqualKey:     "ON",
@@ -351,9 +311,7 @@ func Test_runAdd(t *testing.T) {
 		propPlaybooksDir:          "./test/data/playbooks",
 	})
 
-	emptyAssoc := make(map[string][]string)
-	simulateDefaultAssoc(emptyAssoc)
-	defer unsimulateDefaultAssoc()
+	saveDefaultAssoc(map[string][]string{})
 
 	type args struct {
 		a string
@@ -423,9 +381,7 @@ func Test_runAddBoth(t *testing.T) {
 		propPlaybooksDir:          "./test/data/playbooks",
 	})
 
-	emptyAssoc := make(map[string][]string)
-	simulateDefaultAssoc(emptyAssoc)
-	defer unsimulateDefaultAssoc()
+	saveDefaultAssoc(map[string][]string{})
 
 	type args struct {
 		a string
@@ -482,9 +438,7 @@ func Test_runSmartAdd(t *testing.T) {
 		propSolveKubrayaSeparator: "_",
 	})
 
-	emptyAssoc := make(map[string][]string)
-	simulateDefaultAssoc(emptyAssoc)
-	defer unsimulateDefaultAssoc()
+	saveDefaultAssoc(map[string][]string{})
 
 	type args struct {
 		a string
@@ -603,8 +557,7 @@ func Test_runRemove(t *testing.T) {
 	assoc["boy"] = []string{"girl", "man", "child"}
 	assoc["girl"] = []string{"woman"}
 
-	simulateDefaultAssoc(assoc)
-	defer unsimulateDefaultAssoc()
+	saveDefaultAssoc(assoc)
 
 	type args struct {
 		a string
@@ -678,8 +631,7 @@ func Test_runRemoveBoth(t *testing.T) {
 	assoc["to"] = []string{"from"}
 	assoc["subject"] = []string{"body"}
 
-	simulateDefaultAssoc(assoc)
-	defer unsimulateDefaultAssoc()
+	saveDefaultAssoc(assoc)
 
 	type args struct {
 		a string
@@ -731,8 +683,7 @@ func Test_runView(t *testing.T) {
 	assoc["boy"] = []string{"girl", "man", "child"}
 	assoc["girl"] = []string{"woman"}
 
-	simulateDefaultAssoc(assoc)
-	defer unsimulateDefaultAssoc()
+	saveDefaultAssoc(assoc)
 
 	type args struct {
 		a string
@@ -951,8 +902,7 @@ func Test_runSolve(t *testing.T) {
 	assoc["max"] = []string{"m", "a", "x"}
 	assoc["min"] = []string{"m", "i", "n"}
 
-	simulateDefaultAssoc(assoc)
-	defer unsimulateDefaultAssoc()
+	saveDefaultAssoc(assoc)
 
 	type args struct {
 		kubraya string
@@ -1029,9 +979,6 @@ func Test_runSearchDict(t *testing.T) {
 		propPlaybooksDir:    "./test/data/playbooks",
 		propDictsExt:        ".test",
 	})
-
-	simulateProperty(propDictsExt, ".test")
-	defer unsimulateProperty(propDictsExt)
 
 	dictsDir := getFullDictsDir()
 	fileutils.FilePutContents(dictsDir+"/"+"dict.test", strings.Join(
@@ -1245,8 +1192,7 @@ func Test_runGuess(t *testing.T) {
 	assoc["6"] = []string{"7", "six", "mi"}
 	assoc["thanks"] = []string{"yw", "ty"}
 
-	simulateDefaultAssoc(assoc)
-	defer unsimulateDefaultAssoc()
+	saveDefaultAssoc(assoc)
 
 	type args struct {
 		kubraya string
